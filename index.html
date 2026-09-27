@@ -28,7 +28,10 @@
           <h2>Tutte le tue carte, valore compreso.</h2>
           <p>Cerca una carta, aggiungila alla raccolta e conserva quantità, condizione, prezzo pagato e quotazione Cardmarket.</p>
         </div>
-        <button class="btn btn-primary" data-go="search">+ Aggiungi carta</button>
+        <div class="hero-actions">
+          <button class="btn btn-primary" data-go="search">+ Aggiungi carta</button>
+          <button id="homeScanBtn" class="btn btn-secondary" type="button">📷 Scansiona carta</button>
+        </div>
       </div>
 
       <div class="stats-grid">
@@ -49,6 +52,36 @@
       <div class="section-head">
         <div><div class="eyebrow">CATALOGO</div><h2>Cerca una carta</h2></div>
       </div>
+      <div class="scanner-panel card-panel">
+        <div class="scanner-copy">
+          <span class="pill">NOVITÀ</span>
+          <h3>Scansiona una carta con la fotocamera</h3>
+          <p>Fotografa la carta intera, ben illuminata e il più possibile dritta. L'app leggerà nome e numero e ti proporrà le corrispondenze più probabili.</p>
+          <div class="scanner-tip">La foto viene analizzata sul dispositivo; al catalogo vengono inviati solo i termini necessari alla ricerca.</div>
+        </div>
+        <div class="scanner-actions">
+          <label class="btn btn-primary file-label">📷 Scatta foto
+            <input id="scanCamera" type="file" accept="image/*" capture="environment" hidden />
+          </label>
+          <label class="btn btn-secondary file-label">🖼️ Scegli foto
+            <input id="scanGallery" type="file" accept="image/*" hidden />
+          </label>
+        </div>
+        <div id="scanPreviewWrap" class="scan-preview-wrap hidden">
+          <img id="scanPreview" alt="Anteprima carta da riconoscere" />
+        </div>
+        <div id="scanProgress" class="scan-progress hidden" aria-live="polite">
+          <div class="progress-track"><div id="scanProgressBar" class="progress-bar"></div></div>
+          <p id="scanStatus" class="muted">Preparazione riconoscimento…</p>
+        </div>
+        <div id="scanDetected" class="scan-detected hidden">
+          <strong>Testo rilevato</strong>
+          <p id="scanDetectedText"></p>
+        </div>
+      </div>
+      <div id="scanResults" class="card-results scan-results"></div>
+
+      <div class="manual-search-label"><span>oppure cerca manualmente</span></div>
       <div class="search-row card-panel">
         <input id="searchInput" type="search" placeholder="Es. Charizard, Pikachu, 151..." autocomplete="off" />
         <select id="searchLang" aria-label="Lingua catalogo">

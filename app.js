@@ -84,6 +84,152 @@ function renderWishlist(){
   grid.querySelectorAll('[data-wish-id]').forEach(el=>el.addEventListener('click',()=>openCardById(el.dataset.wishId,wishlist.find(w=>w.id===el.dataset.wishId)?.lang||'it')));
 }
 
+
+let scanPreviewUrl = null;
+let ocrLoadPromise = null;
+
+function setScanProgress(value, message){
+  const box=$('#scanProgress'); const bar=$('#scanProgressBar'); const status=$('#scanStatus');
+  box.classList.remove('hidden');
+  bar.style.width=`${Math.max(2,Math.min(100,Math.round(value)))}%`;
+  if(message) status.textContent=message;
+}
+
+function loadTesseract(){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(ocrLoadPromise) return ocrLoadPromise;
+  ocrLoadPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js';
+    s.async=true;
+    s.onload=()=>window.Tesseract?resolve(window.Tesseract):reject(new Error('OCR non disponibile'));
+    s.onerror=()=>reject(new Error('Impossibile caricare il motore OCR'));
+    document.head.appendChild(s);
+  });
+  return ocrLoadPromise;
+}
+
+async function fileToCanvas(file){
+  let source,w,h,cleanup=()=>{};
+  if('createImageBitmap' in window){
+    try{
+      source=await createImageBitmap(file,{imageOrientation:'from-image'});
+      w=source.width;h=source.height;cleanup=()=>source.close?.();
+    }catch{}
+  }
+  if(!source){
+    const url=URL.createObjectURL(file); const img=new Image();
+    await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url;});
+    source=img;w=img.naturalWidth;h=img.naturalHeight;cleanup=()=>URL.revokeObjectURL(url);
+  }
+  const maxSide=1600; const scale=Math.min(1,maxSide/Math.max(w,h));
+  const canvas=document.createElement('canvas'); canvas.width=Math.max(1,Math.round(w*scale)); canvas.height=Math.max(1,Math.round(h*scale));
+  const ctx=canvas.getContext('2d',{alpha:false}); ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(source,0,0,canvas.width,canvas.height);cleanup();
+  return canvas;
+}
+
+function normalizeScanText(s=''){
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+}
+
+function extractScanHints(topText,bottomText){
+  const joined=`${topText}\n${bottomText}`;
+  const numberMatches=[];
+  const fraction=/\b(\d{1,3})\s*[\/|]\s*(\d{1,3})\b/g;
+  for(const source of [bottomText,joined]){
+    let m; while((m=fraction.exec(source))){ if(!numberMatches.includes(m[1])) numberMatches.push(m[1]); }
+    fraction.lastIndex=0;
+  }
+  const expanded=[];
+  numberMatches.forEach(n=>{expanded.push(n); if(/^0+\d+$/.test(n)){const stripped=String(Number(n)); if(stripped!=='NaN'&&!expanded.includes(stripped))expanded.push(stripped);}});
+
+  const stops=new Set(['BASIC','STAGE','STAGE1','STAGE2','TRAINER','ENERGY','ABILITY','RULE','POKEMON','POKÉMON','ILLUS','WEAKNESS','RESISTANCE','RETREAT','DAMAGE','HP']);
+  const lines=topText.split(/\n+/).map(x=>x.replace(/\bHP\s*\d+\b/ig,' ').replace(/\b\d+\s*HP\b/ig,' ').replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9'’\- ]+/g,' ').replace(/\s+/g,' ').trim()).filter(Boolean);
+  const phrases=[];
+  for(const line of lines){
+    const words=line.split(' ').filter(Boolean);
+    const useful=words.filter(w=>!stops.has(normalizeScanText(w)) && (/^[A-Za-zÀ-ÖØ-öø-ÿ'’\-]{2,}$/.test(w) || /^(EX|GX|VMAX|VSTAR|V)$/i.test(w)));
+    if(useful.length && useful.length<=5){
+      const phrase=useful.join(' ').trim();
+      if(phrase.length>=3 && !phrases.some(x=>normalizeScanText(x)===normalizeScanText(phrase))) phrases.push(phrase);
+    }
+  }
+  const tokens=[];
+  phrases.forEach(p=>p.split(/\s+/).forEach(w=>{const n=normalizeScanText(w);if(n.length>=3&&!stops.has(n)&&!tokens.includes(w))tokens.push(w);}));
+  return {numbers:expanded.slice(0,3),phrases:phrases.slice(0,4),tokens:tokens.slice(0,5),raw:joined.trim()};
+}
+
+function scoreScannedCard(card,hints){
+  const ocr=normalizeScanText(hints.raw); const name=normalizeScanText(card.name); let score=0;
+  if(name && ocr.includes(name)) score+=30;
+  const nameWords=name.split(' ').filter(w=>w.length>=2);
+  nameWords.forEach(w=>{if(ocr.includes(w))score+=5;});
+  const local=normalizeScanText(card.localId).replace(/ /g,'');
+  hints.numbers.forEach((n,i)=>{const nn=normalizeScanText(n).replace(/ /g,''); if(local===nn)score+=30-(i*2);});
+  hints.phrases.forEach(p=>{const np=normalizeScanText(p);if(np&&name.includes(np))score+=12;});
+  return score;
+}
+
+async function findScanCandidates(hints,lang){
+  const urls=[];
+  hints.numbers.forEach(n=>urls.push(`${API}/${lang}/cards?localId=${encodeURIComponent(n)}&pagination:page=1&pagination:itemsPerPage=100`));
+  hints.phrases.slice(0,3).forEach(p=>urls.push(`${API}/${lang}/cards?name=${encodeURIComponent(p)}&pagination:page=1&pagination:itemsPerPage=80`));
+  hints.tokens.slice(0,4).forEach(t=>urls.push(`${API}/${lang}/cards?name=${encodeURIComponent(t)}&pagination:page=1&pagination:itemsPerPage=80`));
+  if(!urls.length) return [];
+  const settled=await Promise.allSettled(urls.map(u=>fetch(u).then(r=>{if(!r.ok)throw new Error();return r.json();})));
+  const map=new Map(); settled.forEach(x=>{if(x.status==='fulfilled'&&Array.isArray(x.value))x.value.forEach(c=>map.set(c.id,c));});
+  const ranked=[...map.values()].map(c=>({...c,_score:scoreScannedCard(c,hints)})).sort((a,b)=>b._score-a._score).slice(0,12);
+  const detailed=await Promise.all(ranked.map(async c=>{try{const r=await fetch(`${API}/${lang}/cards/${encodeURIComponent(c.id)}`);if(r.ok){const d=await r.json();return {...c,setName:d?.set?.name||'',rarity:d?.rarity||''};}}catch{}return c;}));
+  return detailed;
+}
+
+function renderScanCandidates(cards,lang){
+  const grid=$('#scanResults');
+  if(!cards.length){grid.innerHTML='<div class="scan-empty">Non ho trovato una corrispondenza sicura. Prova con una foto più ravvicinata e senza riflessi, oppure usa la ricerca manuale qui sotto.</div>';return;}
+  grid.innerHTML=cards.map((c,i)=>`<article class="result-card" data-card-id="${safe(c.id)}" data-lang="${safe(lang)}"><div class="card-image-wrap">${c.image?`<img loading="lazy" src="${safe(imageUrl(c.image,'low'))}" alt="${safe(c.name)}">`:'🃏'}</div><div class="card-info"><h3>${safe(c.name)}</h3><p>${safe(c.setName||'')} · #${safe(c.localId||'')}</p><span class="scan-match-note">${i===0?'Corrispondenza più probabile':'Possibile corrispondenza'}</span><div class="price-line"><span class="tag">Conferma</span></div></div></article>`).join('');
+  grid.querySelectorAll('[data-card-id]').forEach(el=>el.addEventListener('click',()=>openCardById(el.dataset.cardId,el.dataset.lang)));
+}
+
+async function scanCardFile(file){
+  if(!file) return;
+  if(!file.type.startsWith('image/')){toast('Seleziona una foto della carta');return;}
+  const lang=$('#searchLang').value;
+  if(scanPreviewUrl)URL.revokeObjectURL(scanPreviewUrl);
+  scanPreviewUrl=URL.createObjectURL(file);$('#scanPreview').src=scanPreviewUrl;$('#scanPreviewWrap').classList.remove('hidden');
+  $('#scanDetected').classList.add('hidden');$('#scanResults').innerHTML='';
+  setScanProgress(4,'Preparazione della foto…');
+  let worker;
+  try{
+    const canvas=await fileToCanvas(file);
+    setScanProgress(10,'Caricamento del riconoscimento ottico…');
+    await loadTesseract();
+    worker=await Tesseract.createWorker('eng',1,{logger:m=>{
+      if(m.status==='recognizing text'&&Number.isFinite(m.progress)) setScanProgress(15+(m.progress*55),'Lettura di nome e numero della carta…');
+    }});
+    const w=canvas.width,h=canvas.height;
+    const top=await worker.recognize(canvas,{rectangle:{left:0,top:0,width:w,height:Math.max(1,Math.round(h*.38))}});
+    setScanProgress(72,'Lettura del numero della carta…');
+    const bottom=await worker.recognize(canvas,{rectangle:{left:0,top:Math.round(h*.58),width:w,height:Math.max(1,Math.round(h*.42))}});
+    const topText=top?.data?.text||'', bottomText=bottom?.data?.text||'';
+    const hints=extractScanHints(topText,bottomText);
+    const compact=hints.raw.replace(/\s+/g,' ').trim().slice(0,260);
+    $('#scanDetectedText').textContent=compact||'Nessun testo leggibile';$('#scanDetected').classList.remove('hidden');
+    if(hints.numbers[0]) $('#searchInput').value=hints.numbers[0]; else if(hints.phrases[0]) $('#searchInput').value=hints.phrases[0];
+    setScanProgress(82,'Confronto con il catalogo Pokémon…');
+    const matches=await findScanCandidates(hints,lang);
+    renderScanCandidates(matches,lang);
+    setScanProgress(100,matches.length?`Trovate ${matches.length} possibili corrispondenze. Tocca la carta corretta.`:'Nessuna corrispondenza automatica. Puoi riprovare o cercare manualmente.');
+  }catch(err){
+    console.error(err);setScanProgress(100,'Riconoscimento non riuscito. Controlla la connessione e riprova con una foto nitida.');
+    $('#scanResults').innerHTML='<div class="scan-empty">La scansione non è riuscita. Puoi comunque cercare la carta manualmente qui sotto.</div>';
+  }finally{
+    try{await worker?.terminate();}catch{}
+  }
+}
+
+['scanCamera','scanGallery'].forEach(id=>$('#'+id).addEventListener('change',e=>{const f=e.target.files?.[0];scanCardFile(f);e.target.value='';}));
+$('#homeScanBtn').addEventListener('click',()=>{switchView('search');setTimeout(()=>$('#scanCamera').click(),0);});
+
 async function searchCards(){
   const q=$('#searchInput').value.trim(); const lang=$('#searchLang').value;
   if(q.length<2){ $('#searchStatus').textContent='Digita almeno 2 caratteri.'; return; }
