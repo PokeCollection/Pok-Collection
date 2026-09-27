@@ -60,11 +60,12 @@
           <div class="scanner-tip">La foto viene analizzata sul dispositivo; al catalogo vengono inviati solo i termini necessari alla ricerca.</div>
         </div>
         <div class="scanner-actions">
-          <label class="btn btn-primary file-label">📷 Scatta foto
-            <input id="scanCamera" type="file" accept="image/*" capture="environment" hidden />
-          </label>
+          <button id="openGuidedCamera" class="btn btn-primary" type="button">📷 Fotocamera guidata</button>
           <label class="btn btn-secondary file-label">🖼️ Scegli foto
             <input id="scanGallery" type="file" accept="image/*" hidden />
+          </label>
+          <label class="btn btn-secondary file-label">📸 Foto semplice
+            <input id="scanCamera" type="file" accept="image/*" capture="environment" hidden />
           </label>
         </div>
         <div id="scanPreviewWrap" class="scan-preview-wrap hidden">
@@ -75,8 +76,14 @@
           <p id="scanStatus" class="muted">Preparazione riconoscimento…</p>
         </div>
         <div id="scanDetected" class="scan-detected hidden">
-          <strong>Testo rilevato</strong>
-          <p id="scanDetectedText"></p>
+          <strong>Dati rilevati</strong>
+          <div class="scan-correction-grid">
+            <label>Nome carta<input id="scanNameHint" type="text" placeholder="Es. Flaaffy" autocomplete="off" /></label>
+            <label>Numero<input id="scanNumberHint" type="text" inputmode="numeric" placeholder="Es. 028" /></label>
+            <label>Carte nel set<input id="scanTotalHint" type="text" inputmode="numeric" placeholder="Es. 086" /></label>
+            <button id="scanRefineBtn" class="btn btn-secondary" type="button">Cerca con questi dati</button>
+          </div>
+          <details class="ocr-details"><summary>Mostra testo OCR</summary><p id="scanDetectedText"></p></details>
         </div>
       </div>
       <div id="scanResults" class="card-results scan-results"></div>
@@ -151,6 +158,22 @@
     <button class="nav-btn" data-view="wishlist"><span>♡</span>Wishlist</button>
     <button class="nav-btn" data-view="tools"><span>⚙</span>Altro</button>
   </nav>
+
+  <dialog id="scannerCameraDialog" class="camera-dialog">
+    <div class="camera-shell">
+      <div class="camera-head">
+        <div><strong>Inquadra la carta</strong><span>Porta i quattro bordi dentro la cornice</span></div>
+        <button id="closeGuidedCamera" class="camera-close" type="button" aria-label="Chiudi">×</button>
+      </div>
+      <div id="cameraStage" class="camera-stage">
+        <video id="scanVideo" autoplay playsinline muted></video>
+        <div id="cardGuide" class="card-guide"><span>Allinea qui la carta</span></div>
+      </div>
+      <div class="camera-actions">
+        <button id="captureGuidedCard" class="btn btn-primary" type="button">● Scansiona carta</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="cardDialog" class="modal">
     <form method="dialog" class="modal-card" id="cardForm">

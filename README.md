@@ -18,3 +18,7 @@ La collezione è conservata localmente sul dispositivo tramite localStorage. Usa
 
 ## API
 TCGdex REST API: `https://api.tcgdex.net/v2`
+
+
+## Scanner v2
+La fotocamera guidata ritaglia la carta prima dell’OCR. Il riconoscimento legge separatamente nome e numero/set, con correzione manuale rapida prima della ricerca.
