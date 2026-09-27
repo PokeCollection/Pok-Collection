@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="description" content="Catalogo personale di carte Pokémon con quotazioni di mercato." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>PokéCollection</title>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">LA MIA RACCOLTA</div>
+      <h1>PokéCollection</h1>
+    </div>
+    <button id="installBtn" class="btn btn-primary hidden" type="button">Installa app</button>
+  </header>
+
+  <main class="app-shell">
+    <section id="view-home" class="view active">
+      <div class="hero card-panel">
+        <div>
+          <span class="pill">Collezione personale</span>
+          <h2>Tutte le tue carte, valore compreso.</h2>
+          <p>Cerca una carta, aggiungila alla raccolta e conserva quantità, condizione, prezzo pagato e quotazione Cardmarket.</p>
+        </div>
+        <button class="btn btn-primary" data-go="search">+ Aggiungi carta</button>
+      </div>
+
+      <div class="stats-grid">
+        <article class="stat"><span>Carte</span><strong id="statCards">0</strong></article>
+        <article class="stat"><span>Valore stimato</span><strong id="statValue">€0,00</strong></article>
+        <article class="stat"><span>Totale speso</span><strong id="statSpent">€0,00</strong></article>
+        <article class="stat"><span>Differenza</span><strong id="statProfit">€0,00</strong></article>
+      </div>
+
+      <div class="section-head">
+        <div><div class="eyebrow">IN EVIDENZA</div><h2>Carte di maggior valore</h2></div>
+        <button class="text-btn" data-go="collection">Vedi tutte</button>
+      </div>
+      <div id="topCards" class="collection-grid empty-state">Nessuna carta ancora inserita.</div>
+    </section>
+
+    <section id="view-search" class="view">
+      <div class="section-head">
+        <div><div class="eyebrow">CATALOGO</div><h2>Cerca una carta</h2></div>
+      </div>
+      <div class="search-row card-panel">
+        <input id="searchInput" type="search" placeholder="Es. Charizard, Pikachu, 151..." autocomplete="off" />
+        <select id="searchLang" aria-label="Lingua catalogo">
+          <option value="it" selected>Italiano</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+        </select>
+        <button id="searchBtn" class="btn btn-primary" type="button">Cerca</button>
+      </div>
+      <p id="searchStatus" class="muted">Digita almeno 2 caratteri. Puoi cercare anche il numero della carta.</p>
+      <div id="searchResults" class="card-results"></div>
+    </section>
+
+    <section id="view-collection" class="view">
+      <div class="section-head collection-title-row">
+        <div><div class="eyebrow">ARCHIVIO</div><h2>La mia collezione</h2></div>
+        <div class="toolbar">
+          <input id="collectionFilter" type="search" placeholder="Filtra..." />
+          <select id="collectionSort" aria-label="Ordina collezione">
+            <option value="value">Valore</option>
+            <option value="name">Nome</option>
+            <option value="recent">Più recenti</option>
+          </select>
+        </div>
+      </div>
+      <div id="collectionGrid" class="collection-grid"></div>
+    </section>
+
+    <section id="view-wishlist" class="view">
+      <div class="section-head"><div><div class="eyebrow">DESIDERI</div><h2>Wishlist</h2></div></div>
+      <div id="wishlistGrid" class="collection-grid"></div>
+    </section>
+
+    <section id="view-tools" class="view">
+      <div class="section-head"><div><div class="eyebrow">DATI</div><h2>Backup e impostazioni</h2></div></div>
+      <div class="tools-grid">
+        <article class="card-panel tool-card">
+          <h3>Backup collezione</h3>
+          <p>Esporta un file JSON con tutte le carte, prezzi e note.</p>
+          <button id="exportBtn" class="btn btn-secondary" type="button">Esporta backup</button>
+        </article>
+        <article class="card-panel tool-card">
+          <h3>Ripristina backup</h3>
+          <p>Importa un backup precedentemente esportato.</p>
+          <label class="btn btn-secondary file-label">Importa JSON<input id="importInput" type="file" accept="application/json,.json" hidden /></label>
+        </article>
+        <article class="card-panel tool-card">
+          <h3>Valutazioni</h3>
+          <p>Il valore automatico è un riferimento Cardmarket. Se inserisci una valutazione manuale, quella viene usata nel totale della collezione.</p>
+        </article>
+        <article class="card-panel tool-card">
+          <h3>Installazione</h3>
+          <p id="installHelp">Apri questa webapp da Chrome e usa “Installa app” oppure “Aggiungi alla schermata Home”.</p>
+          <button id="installBtn2" class="btn btn-primary hidden" type="button">Installa sul telefono</button>
+        </article>
+      </div>
+      <p class="source-note">Dati catalogo e quotazioni: TCGdex. Le quotazioni sono indicative e possono non riflettere lingua, stato reale, grading o prezzo finale di vendita.</p>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navigazione principale">
+    <button class="nav-btn active" data-view="home"><span>⌂</span>Home</button>
+    <button class="nav-btn" data-view="search"><span>⌕</span>Cerca</button>
+    <button class="nav-btn" data-view="collection"><span>▦</span>Collezione</button>
+    <button class="nav-btn" data-view="wishlist"><span>♡</span>Wishlist</button>
+    <button class="nav-btn" data-view="tools"><span>⚙</span>Altro</button>
+  </nav>
+
+  <dialog id="cardDialog" class="modal">
+    <form method="dialog" class="modal-card" id="cardForm">
+      <button class="close-btn" value="cancel" aria-label="Chiudi">×</button>
+      <div id="modalContent"></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
